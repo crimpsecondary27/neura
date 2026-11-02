@@ -186,7 +186,7 @@ More detail: [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md).
 
 ## VS Code Plugin
 
-[Neura for VS Code](https://github.com/Azozrav4/NeuraVSCodePLugin) — syntax highlighting, live diagnostics, build/run, and formatting.
+- [Neura for VS Code](https://github.com/Azozrav4/NeuraVSCodePLugin) — syntax highlighting, live diagnostics, build/run, and formatting.
   
 ## License
 
