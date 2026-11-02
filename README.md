@@ -183,7 +183,9 @@ More detail: [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md).
   and build-verified).
 - No registry downloads.
 - No user-defined generics/traits, struct methods, or closures.
-
+- 
+**Editor support:** [Neura for VS Code](https://github.com/Azozrav4/NeuraVSCodePLugin) — syntax highlighting, live diagnostics, build/run, and formatting.
+  
 ## License
 
 MIT
