@@ -1,0 +1,167 @@
+# Neura port of editors/vscode-neura/src/extension.js.
+#
+# Only the parts that do not depend on the VS Code Extension Host or Node can
+# be expressed in Neura 0.1.0. Translated here:
+#
+#   is_space                  is_space
+#   clamp                     clamp
+#   line_count                source.split('\n').length
+#   zeroWidthRange            zero_width_start + zero_width_range_text
+#   diagnosticRange           diagnostic_range_text (line/column path)
+#   positionAt                position_of
+#   severity ternary          severity_of
+#   toDiagnostic message join diagnostic_text
+#   quote                     quote
+#
+# Not translatable: activate/deactivate, the vscode.* API, child_process.spawn,
+# fs.mkdtempSync, JSON.parse, Promises, classes and regular expressions. Neura
+# has no host FFI, closures, async or JSON parser, so the editor glue stays
+# JavaScript; this file ports its host-independent algorithms and runs them on
+# the span the real CLI reports for a broken source file.
+#
+# Run: neura run examples/vscode_extension.neura
+
+fn is_space(c: Str) -> Bool:
+    # JavaScript's /\s/ also matches Unicode spaces; Neura 0.1.0 has no
+    # character-class API, so ASCII whitespace is matched explicitly.
+    return c == " " || c == "\t" || c == "\n" || c == "\r"
+
+fn clamp(value: Int, min: Int, max: Int) -> Int:
+    result = value
+    if result < min:
+        result = min
+    if result > max:
+        result = max
+    return result
+
+fn line_count(&source: Str) -> Int:
+    count = 1
+    for i in range(len(source)):
+        if source[i] == "\n":
+            count = count + 1
+    return count
+
+# Offset of the nearest preceding non-space character, used to give a
+# zero-length span a visible squiggle. Falls back to `offset` itself.
+fn zero_width_start(&source: Str, offset: Int) -> Int:
+    index = clamp(offset, 0, len(source)) - 1
+    found = false
+    while index >= 0:
+        if is_space(source[index]):
+            index = index - 1
+        else:
+            found = true
+            break
+    if found:
+        return index
+    return offset
+
+fn digit_text(d: Int) -> Str:
+    if d == 0:
+        return "0"
+    if d == 1:
+        return "1"
+    if d == 2:
+        return "2"
+    if d == 3:
+        return "3"
+    if d == 4:
+        return "4"
+    if d == 5:
+        return "5"
+    if d == 6:
+        return "6"
+    if d == 7:
+        return "7"
+    if d == 8:
+        return "8"
+    return "9"
+
+fn int_to_text(n: Int) -> Str:
+    if n < 0:
+        return "-" + int_to_text(0 - n)
+    if n < 10:
+        return digit_text(n)
+    return int_to_text(n / 10) + digit_text(n - (n / 10) * 10)
+
+# document.positionAt(offset), with 1-based line and column. Character offsets
+# are used instead of UTF-16 code units; the two differ only for non-BMP text.
+fn position_of(&source: Str, offset: Int) -> Str:
+    line = 1
+    column = 1
+    limit = clamp(offset, 0, len(source))
+    for i in range(limit):
+        if source[i] == "\n":
+            line = line + 1
+            column = 1
+        else:
+            column = column + 1
+    return int_to_text(line) + ":" + int_to_text(column)
+
+fn zero_width_range_text(&source: Str, offset: Int) -> Str:
+    index = zero_width_start(&source, offset)
+    if index == offset:
+        position = position_of(&source, offset)
+        return position + "-" + position
+    return position_of(&source, index) + "-" + position_of(&source, index + 1)
+
+# diagnosticRange for spans that carry start/end character offsets.
+fn diagnostic_range_text(&source: Str, span_start: Int, span_end: Int) -> Str:
+    total = len(source)
+    start = clamp(span_start, 0, total)
+    end = clamp(span_end, start, total)
+    if end == start:
+        return zero_width_range_text(&source, start)
+    return position_of(&source, start) + "-" + position_of(&source, end)
+
+# VS Code DiagnosticSeverity: Error = 0, Warning = 1, Information = 2.
+fn severity_of(name: Str) -> Int:
+    if name == "error":
+        return 0
+    if name == "warning":
+        return 1
+    return 2
+
+# Message, then "note: ..." lines, then an optional "help: ..." line.
+fn diagnostic_text(message: Str, notes: List[Str], help: Str) -> Str:
+    text = message
+    for note in notes:
+        text = text + "\n" + "note: " + note
+    if help != "":
+        text = text + "\n" + "help: " + help
+    return text
+
+# Shell quoting used when the extension sends the command to a terminal.
+fn quote(value: Str) -> Str:
+    escaped = ""
+    for i in range(len(value)):
+        c = value[i]
+        if c == "\"":
+            escaped = escaped + "\\\""
+        else:
+            escaped = escaped + c
+    return "\"" + escaped + "\""
+
+fn main():
+    # Same source and span the CLI reports for the zero-width diagnostic:
+    # {"line": 3, "column": 1, "start": 23, "end": 23}
+    source = "fn main():\n    x = 1 +\n"
+
+    print("diagnostic range:")
+    print(diagnostic_range_text(&source, 23, 23))
+
+    print("line count:")
+    print(line_count(&source))
+
+    print("severity of \"error\":")
+    print(severity_of("error"))
+
+    print("diagnostic text:")
+    print(diagnostic_text(
+        "expected an expression, found newline",
+        ["span points at the end of the line"],
+        "insert an expression after `+`",
+    ))
+
+    print("quoted executable path:")
+    print(quote("examples/autograd.neura"))

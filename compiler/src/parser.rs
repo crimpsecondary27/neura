@@ -392,7 +392,25 @@ impl Parser {
             TokenKind::Elif | TokenKind::Else | TokenKind::Dedent | TokenKind::Eof => None,
             _ => {
                 let expr = self.parse_expr();
-                if self.check(&TokenKind::Assign) {
+                let op = match self.peek() {
+                    TokenKind::PlusAssign => Some(BinaryOp::Add),
+                    TokenKind::MinusAssign => Some(BinaryOp::Sub),
+                    TokenKind::StarAssign => Some(BinaryOp::Mul),
+                    TokenKind::SlashAssign => Some(BinaryOp::Div),
+                    TokenKind::SlashSlashAssign => Some(BinaryOp::FloorDiv),
+                    TokenKind::PercentAssign => Some(BinaryOp::Mod),
+                    TokenKind::StarStarAssign => Some(BinaryOp::Pow),
+                    _ => None,
+                };
+                if let Some(op) = op {
+                    self.advance();
+                    let value = self.parse_expr();
+                    self.end_stmt();
+                    Some(Stmt {
+                        kind: StmtKind::OpAssign { target: expr, op, value },
+                        span: start.merge(self.token().span),
+                    })
+                } else if self.check(&TokenKind::Assign) {
                     self.advance();
                     let value = self.parse_expr();
                     self.end_stmt();
@@ -572,6 +590,7 @@ impl Parser {
             let op = match self.peek() {
                 TokenKind::Star => BinaryOp::Mul,
                 TokenKind::Slash => BinaryOp::Div,
+                TokenKind::SlashSlash => BinaryOp::FloorDiv,
                 TokenKind::Percent => BinaryOp::Mod,
                 TokenKind::At => BinaryOp::MatMul,
                 _ => break,
@@ -606,8 +625,28 @@ impl Parser {
                 let e = self.parse_unary();
                 Expr { kind: ExprKind::Borrow { expr: Box::new(e), mutable }, span: start }
             }
-            _ => self.parse_postfix(),
+            _ => self.parse_power(),
         }
+    }
+
+    /// Exponentiation binds tighter than unary minus and is right-associative,
+    /// so `-2 ** 2` is `-(2 ** 2)` and `2 ** 3 ** 2` is `2 ** (3 ** 2)`.
+    fn parse_power(&mut self) -> Expr {
+        let base = self.parse_postfix();
+        if self.check(&TokenKind::StarStar) {
+            let op_span = self.token().span;
+            self.advance();
+            let exp = self.parse_unary();
+            return Expr {
+                kind: ExprKind::Binary {
+                    op: BinaryOp::Pow,
+                    lhs: Box::new(base),
+                    rhs: Box::new(exp),
+                },
+                span: op_span,
+            };
+        }
+        base
     }
 
     fn parse_postfix(&mut self) -> Expr {

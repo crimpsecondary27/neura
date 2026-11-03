@@ -159,8 +159,13 @@ backends/   CPU tensor engine, CUDA/ROCm interfaces, device discovery
 runtime/    EIR VM, autograd, layers, optimizers, datasets, caches, profiler
 cli/        the `neura` driver (+ end-to-end tests)
 tools/      npack package manager, canonical formatter
+editors/    VS Code extension (syntax, diagnostics, formatting, run/build)
 examples/   runnable programs and a CSV dataset
 ```
+
+Editor support: [editors/vscode-neura](editors/vscode-neura/README.md) provides
+`.neura` syntax highlighting, snippets, diagnostics from `neura check --json`,
+formatting through `neura fmt`, and run/build commands.
 
 More detail: [ARCHITECTURE.md](ARCHITECTURE.md), [ROADMAP.md](ROADMAP.md).
 

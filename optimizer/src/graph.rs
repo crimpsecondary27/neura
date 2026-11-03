@@ -134,6 +134,7 @@ fn rewrite_reads(inst: &mut Inst, subst: &HashMap<Reg, Reg>) {
         Inst::JumpIfFalse { cond, .. } | Inst::JumpIfTrue { cond, .. } => apply(cond),
         Inst::Return(Some(r)) => apply(r),
         Inst::Print(r) | Inst::Drop(r) => apply(r),
+        Inst::Input { prompt: Some(r), .. } => apply(r),
         _ => {}
     }
 }
@@ -243,6 +244,24 @@ fn fold_bin(op: BinOp, ty: &Ty, a: &ConstVal, b: &ConstVal) -> Option<ConstVal> 
                 }
                 x / y
             }
+            FloorDiv => {
+                if y == 0 {
+                    return None;
+                }
+                let q = x / y;
+                let r = x % y;
+                if r != 0 && ((r < 0) != (y < 0)) {
+                    q - 1
+                } else {
+                    q
+                }
+            }
+            Pow => {
+                if y < 0 || y > u32::MAX as i64 {
+                    return None;
+                }
+                x.wrapping_pow(y as u32)
+            }
             Mod => {
                 if y == 0 {
                     return None;
@@ -259,6 +278,8 @@ fn fold_bin(op: BinOp, ty: &Ty, a: &ConstVal, b: &ConstVal) -> Option<ConstVal> 
         Sub => x - y,
         Mul => x * y,
         Div => x / y,
+        FloorDiv => (x / y).floor(),
+        Pow => x.powf(y),
         Mod => x % y,
         _ => return None,
     };

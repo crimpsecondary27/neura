@@ -109,6 +109,11 @@ pub enum StmtKind {
         target: Expr,
         value: Expr,
     },
+    OpAssign {
+        target: Expr,
+        op: BinaryOp,
+        value: Expr,
+    },
     Expr(Expr),
     If {
         cond: Expr,
@@ -148,7 +153,9 @@ pub enum BinaryOp {
     Sub,
     Mul,
     Div,
+    FloorDiv,
     Mod,
+    Pow,
     Eq,
     Ne,
     Lt,

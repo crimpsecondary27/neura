@@ -412,48 +412,11 @@ impl Checker {
             }
             StmtKind::Assign { target, value } => {
                 let (vexpr, vty) = self.check_expr(value);
-                match &target.kind {
-                    ExprKind::Ident(name) => {
-                        if let Some(var) = self.lookup(name) {
-                            if !var.mutable {
-                                self.diags.push(
-                                    Diagnostic::error(
-                                        "E0203",
-                                        format!("cannot assign to immutable variable `{}`", name),
-                                        Some(target.span),
-                                    )
-                                    .help("declare it with `let mut` or use a bare `x = ...` declaration"),
-                                );
-                            }
-                            if !compatible(&var.ty, &vty) {
-                                self.type_mismatch(&var.ty, &vty, value.span, "assignment");
-                            }
-                            Some(NirStmt::Assign { local: var.local, expr: vexpr, span })
-                        } else {
-                            let local = self.alloc_local(name, vty, true, false);
-                            Some(NirStmt::Let { local, expr: vexpr, span })
-                        }
-                    }
-                    ExprKind::Attr { .. } | ExprKind::Index { .. } => {
-                        self.diags.push(
-                            Diagnostic::error(
-                                "E0311",
-                                "assignment to a field or element is not supported",
-                                Some(target.span),
-                            )
-                            .help("assign a new value to a variable instead"),
-                        );
-                        None
-                    }
-                    _ => {
-                        self.diags.push(Diagnostic::error(
-                            "E0312",
-                            "invalid assignment target",
-                            Some(target.span),
-                        ));
-                        None
-                    }
-                }
+                self.check_assign(target, vexpr, vty, value.span, span)
+            }
+            StmtKind::OpAssign { target, op, value } => {
+                let (vexpr, vty) = self.check_binary(*op, target, value, stmt.span);
+                self.check_assign(target, vexpr, vty, stmt.span, span)
             }
             StmtKind::Expr(e) => {
                 let (expr, _) = self.check_expr(e);
@@ -556,6 +519,58 @@ impl Checker {
                 Some(NirStmt::Continue(span))
             }
             StmtKind::Pass => Some(NirStmt::Pass),
+        }
+    }
+
+    fn check_assign(
+        &mut self,
+        target: &Expr,
+        vexpr: NirExpr,
+        vty: Ty,
+        value_span: Span,
+        span: (usize, usize),
+    ) -> Option<NirStmt> {
+        match &target.kind {
+            ExprKind::Ident(name) => {
+                if let Some(var) = self.lookup(name) {
+                    if !var.mutable {
+                        self.diags.push(
+                            Diagnostic::error(
+                                "E0203",
+                                format!("cannot assign to immutable variable `{}`", name),
+                                Some(target.span),
+                            )
+                            .help("declare it with `let mut` or use a bare `x = ...` declaration"),
+                        );
+                    }
+                    if !compatible(&var.ty, &vty) {
+                        self.type_mismatch(&var.ty, &vty, value_span, "assignment");
+                    }
+                    Some(NirStmt::Assign { local: var.local, expr: vexpr, span })
+                } else {
+                    let local = self.alloc_local(name, vty, true, false);
+                    Some(NirStmt::Let { local, expr: vexpr, span })
+                }
+            }
+            ExprKind::Attr { .. } | ExprKind::Index { .. } => {
+                self.diags.push(
+                    Diagnostic::error(
+                        "E0311",
+                        "assignment to a field or element is not supported",
+                        Some(target.span),
+                    )
+                    .help("assign a new value to a variable instead"),
+                );
+                None
+            }
+            _ => {
+                self.diags.push(Diagnostic::error(
+                    "E0312",
+                    "invalid assignment target",
+                    Some(target.span),
+                ));
+                None
+            }
         }
     }
 
@@ -778,7 +793,9 @@ impl Checker {
             BinaryOp::Sub => BinOp::Sub,
             BinaryOp::Mul => BinOp::Mul,
             BinaryOp::Div => BinOp::Div,
+            BinaryOp::FloorDiv => BinOp::FloorDiv,
             BinaryOp::Mod => BinOp::Mod,
+            BinaryOp::Pow => BinOp::Pow,
             BinaryOp::Eq => BinOp::Eq,
             BinaryOp::Ne => BinOp::Ne,
             BinaryOp::Lt => BinOp::Lt,
@@ -1101,6 +1118,9 @@ impl Checker {
                     return self.check_struct_ctor(name, args, span);
                 }
                 if is_builtin_global(name) {
+                    if name == "input" {
+                        return self.check_input_call(args, span);
+                    }
                     let checked = self.check_args(args);
                     let builtin_name = if name == "Tensor" {
                         "tensor.Tensor".to_string()
@@ -1174,6 +1194,77 @@ impl Checker {
                 (NirExpr::Unit, Ty::Any)
             }
         }
+    }
+
+    /// `input()` reads a line and returns `Str`; `input(TYPE)` and
+    /// `input(prompt, TYPE)` parse it as `Int`, `Float`, `Bool` or `Str`.
+    fn check_input_call(&mut self, args: &[Arg], span: Span) -> (NirExpr, Ty) {
+        let mut target = Ty::Str;
+        let mut target_set = false;
+        let mut prompt_seen = false;
+        let mut checked = Vec::new();
+        for a in args {
+            if a.name.is_none() {
+                if let ExprKind::Ident(t) = &a.value.kind {
+                    if self.lookup(t).is_none() && matches!(t.as_str(), "Int" | "Float" | "Bool" | "Str") {
+                        if target_set {
+                            self.diags.push(Diagnostic::error(
+                                "E0301",
+                                "`input` expects exactly one type argument".to_string(),
+                                Some(span),
+                            ));
+                        }
+                        target_set = true;
+                        target = match t.as_str() {
+                            "Int" => Ty::Int,
+                            "Float" => Ty::Float,
+                            "Bool" => Ty::Bool,
+                            _ => Ty::Str,
+                        };
+                        continue;
+                    }
+                    if self.lookup(t).is_none()
+                        && matches!(t.as_str(), "Unit" | "Tensor" | "List" | "Any")
+                    {
+                        self.diags.push(
+                            Diagnostic::error(
+                                "E0301",
+                                format!("`input` does not support type `{}`", t),
+                                Some(span),
+                            )
+                            .help("input supports Int, Float, Bool and Str"),
+                        );
+                        continue;
+                    }
+                }
+            }
+            if prompt_seen {
+                self.diags.push(Diagnostic::error(
+                    "E0301",
+                    "`input` expects at most one prompt".to_string(),
+                    Some(span),
+                ));
+            }
+            prompt_seen = true;
+            let (expr, ty) = self.check_expr(&a.value);
+            if !matches!(ty, Ty::Str | Ty::Any) {
+                self.diags.push(Diagnostic::error(
+                    "E0301",
+                    format!("`input` expects a string prompt, found {}", ty.name()),
+                    Some(a.span),
+                ));
+            }
+            checked.push(CallArg { name: a.name.clone(), expr });
+        }
+        (
+            NirExpr::Call {
+                callee: Box::new(NirExpr::Builtin { name: "input".into(), ty: Ty::Any }),
+                args: checked,
+                ty: target.clone(),
+                span: (span.start, span.end),
+            },
+            target,
+        )
     }
 
     fn check_args(&mut self, args: &[Arg]) -> (Vec<CallArg>, Vec<Ty>, Vec<(String, Ty)>) {
@@ -1790,7 +1881,7 @@ fn list_shape(e: &Expr) -> Option<Vec<Dim>> {
 fn is_builtin_global(name: &str) -> bool {
     matches!(
         name,
-        "print" | "len" | "range" | "abs" | "sqrt" | "exp" | "log" | "tanh" | "int" | "float" | "Tensor"
+        "print" | "input" | "len" | "range" | "abs" | "sqrt" | "exp" | "log" | "tanh" | "int" | "float" | "Tensor"
     )
 }
 

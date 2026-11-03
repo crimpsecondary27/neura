@@ -112,6 +112,17 @@ pub fn call_builtin(name: &str, args: &[Ty], kwargs: &[(String, Ty)]) -> Result<
     let out = match name {
         // ---- core builtins -------------------------------------------------
         "print" => Ty::Unit,
+        "input" => {
+            if args.len() > 1 {
+                return Err("`input` expects at most 1 argument".into());
+            }
+            if let Some(prompt) = args.first() {
+                if !matches!(prompt, Ty::Str | Ty::Any) {
+                    return Err("`input` expects a string prompt".into());
+                }
+            }
+            Ty::Str
+        }
         "len" => {
             match arg_ty(args, 0) {
                 Some(Ty::List(_))

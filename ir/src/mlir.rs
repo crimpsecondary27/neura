@@ -196,6 +196,8 @@ fn print_inst(out: &mut String, inst: &Inst, _types: &[Ty], counter: &mut usize)
                 crate::BinOp::Sub => "arith.subf",
                 crate::BinOp::Mul => "arith.mulf",
                 crate::BinOp::Div => "arith.divf",
+                crate::BinOp::FloorDiv => "arith.divf",
+                crate::BinOp::Pow => "arith.powf",
                 crate::BinOp::Mod => "arith.remf",
                 crate::BinOp::Eq => "arith.cmpf oeq",
                 crate::BinOp::Ne => "arith.cmpf one",
@@ -254,6 +256,7 @@ fn inst_name(inst: &Inst) -> &'static str {
         Inst::Return(_) => "return",
         Inst::Drop(_) => "drop",
         Inst::Print(_) => "print",
+        Inst::Input { .. } => "input",
         _ => "op",
     }
 }

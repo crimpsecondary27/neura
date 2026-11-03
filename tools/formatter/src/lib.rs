@@ -158,6 +158,13 @@ fn format_stmt(stmt: &Stmt, depth: usize) -> String {
             format_expr(target, 0, false),
             format_expr(value, 0, false)
         ),
+        StmtKind::OpAssign { target, op, value } => format!(
+            "{}{} {}= {}\n",
+            pad,
+            format_expr(target, 0, false),
+            binary_symbol(*op),
+            format_expr(value, 0, false)
+        ),
         StmtKind::Expr(e) => format!("{}{}\n", pad, format_expr(e, 0, false)),
         StmtKind::Return(None) => format!("{}return\n", pad),
         StmtKind::Return(Some(e)) => format!("{}return {}\n", pad, format_expr(e, 0, false)),
@@ -207,10 +214,11 @@ fn precedence(e: &Expr) -> u8 {
             BinaryOp::Eq | BinaryOp::Ne => 3,
             BinaryOp::Lt | BinaryOp::Le | BinaryOp::Gt | BinaryOp::Ge => 4,
             BinaryOp::Add | BinaryOp::Sub => 5,
-            BinaryOp::Mul | BinaryOp::Div | BinaryOp::Mod | BinaryOp::MatMul => 6,
+            BinaryOp::Mul | BinaryOp::Div | BinaryOp::FloorDiv | BinaryOp::Mod | BinaryOp::MatMul => 6,
+            BinaryOp::Pow => 8,
         },
         ExprKind::Unary { .. } => 7,
-        _ => 8,
+        _ => 9,
     }
 }
 
@@ -220,7 +228,9 @@ fn binary_symbol(op: BinaryOp) -> &'static str {
         BinaryOp::Sub => "-",
         BinaryOp::Mul => "*",
         BinaryOp::Div => "/",
+        BinaryOp::FloorDiv => "//",
         BinaryOp::Mod => "%",
+        BinaryOp::Pow => "**",
         BinaryOp::Eq => "==",
         BinaryOp::Ne => "!=",
         BinaryOp::Lt => "<",
@@ -259,26 +269,29 @@ fn format_expr(e: &Expr, min_prec: u8, right_of_same: bool) -> String {
                 format!("&{}", format_expr(expr, 7, false))
             }
         }
-        ExprKind::Binary { op, lhs, rhs } => format!(
-            "{} {} {}",
-            format_expr(lhs, own, false),
-            binary_symbol(*op),
-            format_expr(rhs, own, true)
-        ),
+        ExprKind::Binary { op, lhs, rhs } => {
+            let lhs_prec = if matches!(op, BinaryOp::Pow) { own + 1 } else { own };
+            format!(
+                "{} {} {}",
+                format_expr(lhs, lhs_prec, false),
+                binary_symbol(*op),
+                format_expr(rhs, own, true)
+            )
+        }
         ExprKind::Call { callee, args } => {
             let inner: Vec<String> = args.iter().map(format_arg).collect();
-            format!("{}({})", format_expr(callee, 8, false), inner.join(", "))
+            format!("{}({})", format_expr(callee, 9, false), inner.join(", "))
         }
-        ExprKind::Attr { obj, name } => format!("{}.{}", format_expr(obj, 8, false), name),
+        ExprKind::Attr { obj, name } => format!("{}.{}", format_expr(obj, 9, false), name),
         ExprKind::Index { obj, index } => format!(
             "{}[{}]",
-            format_expr(obj, 8, false),
+            format_expr(obj, 9, false),
             format_expr(index, 0, false)
         ),
         ExprKind::Slice { obj, start, end } => {
             let s = start.as_ref().map(|e| format_expr(e, 0, false)).unwrap_or_default();
             let t = end.as_ref().map(|e| format_expr(e, 0, false)).unwrap_or_default();
-            format!("{}[{}:{}]", format_expr(obj, 8, false), s, t)
+            format!("{}[{}:{}]", format_expr(obj, 9, false), s, t)
         }
     };
     let wraps = own < min_prec || (right_of_same && own == min_prec && own <= 6);
@@ -361,6 +374,18 @@ mod tests {
         let out = format_source(src).unwrap();
         assert!(out.contains("fn f(a: Tensor[2, 3, f32]) -> Tensor[2, 3, f32]:"));
         assert!(out.contains("    elif true:"));
+    }
+
+    #[test]
+    fn formats_power_floor_div_and_compound_assignment() {
+        let src = "fn main():\n  x = 2 ** 3 ** 2\n  y = (2 ** 3) ** 2\n  z = -2 ** 2\n  w = 7 // 2\n  x **= 2\n  w //= 2\n";
+        let out = format_source(src).unwrap();
+        assert!(out.contains("x = 2 ** 3 ** 2"), "{}", out);
+        assert!(out.contains("y = (2 ** 3) ** 2"), "{}", out);
+        assert!(out.contains("z = -2 ** 2"), "{}", out);
+        assert!(out.contains("w = 7 // 2"), "{}", out);
+        assert!(out.contains("x **= 2"), "{}", out);
+        assert!(out.contains("w //= 2"), "{}", out);
     }
 
     #[test]

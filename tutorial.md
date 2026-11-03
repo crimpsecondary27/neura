@@ -78,6 +78,19 @@ Rules:
 Built-in scalar types are `Int`, `Float`, `Bool`, `Str` and `Unit`. Arithmetic
 promotes `Int` to `Float`. `List[T]` is a homogeneous list:
 
+Arithmetic operators are `+`, `-`, `*`, `/`, `//` (floor division), `%` and
+`**` (exponentiation, right-associative). `x += 1`, `-=`, `*=`, `/=`, `//=`,
+`%=` and `**=` update a variable in place. Integer `**` rejects negative
+exponents; use a `Float` base for those.
+
+```neura
+fn main():
+    let mut total = 2 ** 10      # 1024
+    total //= 3                  # floor division
+    print(total)
+    print(-7 // 2)               # -4
+```
+
 ```neura
 fn main():
     values = [1, 2, 3]

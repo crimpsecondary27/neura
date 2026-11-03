@@ -20,7 +20,7 @@ use neura_backends::device;
 use neura_backends::tensor::Tensor;
 use neura_ir::eir::{EirFunction, EirProgram, Inst, Reg};
 use neura_ir::ops::{BinOp, FusedExpr, FusedSpec, TensorOp, UnOp};
-use neura_ir::types::{Dim, DType, TensorTy};
+use neura_ir::types::{Dim, DType, TensorTy, Ty};
 use std::collections::HashMap;
 use std::rc::Rc;
 use std::time::Instant;
@@ -455,6 +455,19 @@ impl<'p> Machine<'p> {
                     println!("{}", text);
                 }
                 self.output.push(text);
+                Ok(Flow::Next)
+            }
+            Inst::Input { dst, prompt, ty } => {
+                if let Some(r) = prompt {
+                    let text = self.read(frame, *r).as_str()?;
+                    if !self.options.quiet {
+                        print!("{}", text);
+                        let _ = std::io::Write::flush(&mut std::io::stdout());
+                    }
+                }
+                let line = read_line()?;
+                let v = parse_input(&line, ty)?;
+                self.write(frame, *dst, v);
                 Ok(Flow::Next)
             }
         }
@@ -1003,6 +1016,41 @@ impl<'p> Machine<'p> {
 // Helpers
 // ---------------------------------------------------------------------------
 
+fn read_line() -> Result<String, String> {
+    let mut line = String::new();
+    std::io::stdin()
+        .read_line(&mut line)
+        .map_err(|e| format!("cannot read input: {}", e))?;
+    while line.ends_with('\n') || line.ends_with('\r') {
+        line.pop();
+    }
+    Ok(line)
+}
+
+fn parse_input(line: &str, ty: &Ty) -> Result<Value, String> {
+    match ty {
+        Ty::Int => line
+            .trim()
+            .parse::<i64>()
+            .map(Value::Int)
+            .map_err(|_| format!("expected an Int input, found {:?}", line)),
+        Ty::Float => line
+            .trim()
+            .parse::<f64>()
+            .map(Value::Float)
+            .map_err(|_| format!("expected a Float input, found {:?}", line)),
+        Ty::Bool => match line.trim().to_ascii_lowercase().as_str() {
+            "true" | "1" => Ok(Value::Bool(true)),
+            "false" | "0" => Ok(Value::Bool(false)),
+            _ => Err(format!(
+                "expected a Bool input (true/false), found {:?}",
+                line
+            )),
+        },
+        _ => Ok(Value::Str(line.to_string())),
+    }
+}
+
 fn layer_value(l: Layer) -> Value {
     Value::Layer(Rc::new(l))
 }
@@ -1134,6 +1182,21 @@ fn binary(op: BinOp, a: &Value, b: &Value, ty: &neura_ir::types::Ty) -> Result<V
                 }
                 x / y
             }
+            BinOp::FloorDiv => {
+                if y == 0 {
+                    return Err("integer floor division by zero".into());
+                }
+                floor_div(x, y)
+            }
+            BinOp::Pow => {
+                if y < 0 {
+                    return Err("negative exponent is not supported for integers".into());
+                }
+                if y > u32::MAX as i64 {
+                    return Err("integer exponent is too large".into());
+                }
+                x.wrapping_pow(y as u32)
+            }
             BinOp::Mod => {
                 if y == 0 {
                     return Err("integer modulo by zero".into());
@@ -1151,6 +1214,8 @@ fn binary(op: BinOp, a: &Value, b: &Value, ty: &neura_ir::types::Ty) -> Result<V
             BinOp::Sub => x - y,
             BinOp::Mul => x * y,
             BinOp::Div => x / y,
+            BinOp::FloorDiv => (x / y).floor(),
+            BinOp::Pow => x.powf(y),
             BinOp::Mod => x % y,
             _ => return Err(format!("operator `{}` is not defined for numbers", op.symbol())),
         };
@@ -1161,6 +1226,17 @@ fn binary(op: BinOp, a: &Value, b: &Value, ty: &neura_ir::types::Ty) -> Result<V
         } else {
             Ok(Value::Float(v))
         }
+    }
+}
+
+/// Floor division for integers (Rust's `/` truncates toward zero).
+fn floor_div(x: i64, y: i64) -> i64 {
+    let q = x / y;
+    let r = x % y;
+    if r != 0 && ((r < 0) != (y < 0)) {
+        q - 1
+    } else {
+        q
     }
 }
 
@@ -1468,6 +1544,7 @@ fn inst_key(inst: &Inst) -> &'static str {
             _ => "builtin",
         },
         Inst::MethodCall { .. } => "method_call",
+        Inst::Input { .. } => "input",
         _ => "control",
     }
 }
@@ -1509,6 +1586,10 @@ fn disasm(i: &Inst) -> String {
         Inst::Return(None) => "return".to_string(),
         Inst::Drop(r) => format!("drop %{}", r),
         Inst::Print(r) => format!("print %{}", r),
+        Inst::Input { dst, prompt, ty } => match prompt {
+            Some(p) => format!("%{}: {} = input(%{})", dst, ty.name(), p),
+            None => format!("%{}: {} = input()", dst, ty.name()),
+        },
     }
 }
 

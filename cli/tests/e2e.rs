@@ -28,6 +28,26 @@ fn run(args: &[&str]) -> Output {
         .expect("failed to launch the neura binary")
 }
 
+fn run_with_stdin(args: &[&str], stdin: &str) -> Output {
+    use std::io::Write;
+    use std::process::Stdio;
+    let mut child = Command::new(BIN)
+        .args(args)
+        .current_dir(workspace_root())
+        .stdin(Stdio::piped())
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("failed to launch the neura binary");
+    child
+        .stdin
+        .as_mut()
+        .expect("stdin was not piped")
+        .write_all(stdin.as_bytes())
+        .expect("failed to write to the neura process");
+    child.wait_with_output().expect("failed to wait for the neura binary")
+}
+
 fn stdout_of(output: &Output) -> String {
     String::from_utf8_lossy(&output.stdout).to_string()
 }
@@ -123,6 +143,74 @@ fn build_artifact_runs_through_the_cli() {
     assert!(run_artifact.status.success(), "{}", combined_of(&run_artifact));
     assert_eq!(stdout_of(&run_artifact).trim(), "Tensor[1](7.0)");
     let _ = fs::remove_dir_all(artifact.parent().unwrap());
+}
+
+#[test]
+fn input_reads_a_line_from_stdin() {
+    let source = write_temp(
+        "input.neura",
+        "fn main():\n    name = input(\"name: \")\n    print(\"hello, \" + name)\n",
+    );
+    let output = run_with_stdin(&["run", &source.display().to_string()], "Neura\n");
+    assert!(output.status.success(), "{}", combined_of(&output));
+    let text = stdout_of(&output);
+    assert!(text.lines().last() == Some("name: hello, Neura"), "{}", text);
+    let _ = fs::remove_dir_all(source.parent().unwrap());
+}
+
+#[test]
+fn typed_input_parses_int_float_and_bool() {
+    let source = write_temp(
+        "typed_input.neura",
+        "fn main():\n    age = input(\"age: \", Int)\n    ratio = input(Float)\n    ok = input(Bool)\n    name = input(Str)\n    print(age + 1)\n    print(ratio * 2.0)\n    print(ok)\n    print(name)\n",
+    );
+    let output = run_with_stdin(
+        &["run", &source.display().to_string()],
+        "41\n2.5\nTRUE\nNeura\n",
+    );
+    assert!(output.status.success(), "{}", combined_of(&output));
+    let text = stdout_of(&output);
+    assert_eq!(
+        text.lines().collect::<Vec<_>>(),
+        vec!["age: 42", "5.0", "true", "Neura"],
+        "{}",
+        text
+    );
+    let _ = fs::remove_dir_all(source.parent().unwrap());
+}
+
+#[test]
+fn typed_input_rejects_values_that_do_not_match_the_type() {
+    let source = write_temp(
+        "bad_input.neura",
+        "fn main():\n    n = input(Int)\n    print(n)\n",
+    );
+    let output = run_with_stdin(&["run", &source.display().to_string()], "abc\n");
+    assert_eq!(output.status.code(), Some(1), "{}", combined_of(&output));
+    assert!(
+        combined_of(&output).contains("expected an Int input"),
+        "{}",
+        combined_of(&output)
+    );
+    let _ = fs::remove_dir_all(source.parent().unwrap());
+}
+
+#[test]
+fn math_operators_evaluate() {
+    let source = write_temp(
+        "math.neura",
+        "fn main():\n    print(2 ** 10)\n    print(2 ** 3 ** 2)\n    print(-2 ** 2)\n    print(7 // 2)\n    print(-7 // 2)\n    print(7.5 // 2)\n    let mut x = 5\n    x += 3\n    x *= 2\n    x -= 1\n    x //= 3\n    x %= 4\n    x **= 2\n    print(x)\n    s = \"a\"\n    s += \"b\"\n    print(s)\n",
+    );
+    let output = run(&["run", &source.display().to_string()]);
+    assert!(output.status.success(), "{}", combined_of(&output));
+    let text = stdout_of(&output);
+    assert_eq!(
+        text.lines().collect::<Vec<_>>(),
+        vec!["1024", "512", "-4", "3", "-4", "3.0", "1", "ab"],
+        "{}",
+        text
+    );
+    let _ = fs::remove_dir_all(source.parent().unwrap());
 }
 
 #[test]

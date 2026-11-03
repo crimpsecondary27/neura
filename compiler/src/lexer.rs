@@ -50,7 +50,16 @@ pub enum TokenKind {
     Star,
     Slash,
     Percent,
+    StarStar,
+    SlashSlash,
     Assign,
+    PlusAssign,
+    MinusAssign,
+    StarAssign,
+    SlashAssign,
+    SlashSlashAssign,
+    PercentAssign,
+    StarStarAssign,
     EqEq,
     NotEq,
     Lt,
@@ -122,7 +131,16 @@ impl TokenKind {
             TokenKind::Star => "*",
             TokenKind::Slash => "/",
             TokenKind::Percent => "%",
+            TokenKind::StarStar => "**",
+            TokenKind::SlashSlash => "//",
             TokenKind::Assign => "=",
+            TokenKind::PlusAssign => "+=",
+            TokenKind::MinusAssign => "-=",
+            TokenKind::StarAssign => "*=",
+            TokenKind::SlashAssign => "/=",
+            TokenKind::SlashSlashAssign => "//=",
+            TokenKind::PercentAssign => "%=",
+            TokenKind::StarStarAssign => "**=",
             TokenKind::EqEq => "==",
             TokenKind::NotEq => "!=",
             TokenKind::Lt => "<",
@@ -486,6 +504,20 @@ impl<'a> Lexer<'a> {
                     line_had_token = true;
                 }
                 _ => {
+                    let three = (c, self.peek_at(1), self.peek_at(2));
+                    let kind3 = match three {
+                        ('*', Some('*'), Some('=')) => Some(TokenKind::StarStarAssign),
+                        ('/', Some('/'), Some('=')) => Some(TokenKind::SlashSlashAssign),
+                        _ => None,
+                    };
+                    if let Some(kind) = kind3 {
+                        self.bump();
+                        self.bump();
+                        self.bump();
+                        self.push(kind, start, line, col, line_indent);
+                        line_had_token = true;
+                        continue;
+                    }
                     let two = (c, self.peek_at(1));
                     let kind = match two {
                         ('-', Some('>')) => Some(TokenKind::Arrow),
@@ -495,6 +527,13 @@ impl<'a> Lexer<'a> {
                         ('>', Some('=')) => Some(TokenKind::Ge),
                         ('&', Some('&')) => Some(TokenKind::AmpAmp),
                         ('|', Some('|')) => Some(TokenKind::PipePipe),
+                        ('*', Some('*')) => Some(TokenKind::StarStar),
+                        ('/', Some('/')) => Some(TokenKind::SlashSlash),
+                        ('+', Some('=')) => Some(TokenKind::PlusAssign),
+                        ('-', Some('=')) => Some(TokenKind::MinusAssign),
+                        ('*', Some('=')) => Some(TokenKind::StarAssign),
+                        ('/', Some('=')) => Some(TokenKind::SlashAssign),
+                        ('%', Some('=')) => Some(TokenKind::PercentAssign),
                         _ => None,
                     };
                     if let Some(kind) = kind {
@@ -600,6 +639,14 @@ mod tests {
     fn reports_bad_indent() {
         let (_, diags) = Lexer::new("if true:\n    x = 1\n  y = 2\n").lex();
         assert!(diags.iter().any(|d| d.code == "E0002"));
+    }
+
+    #[test]
+    fn lexes_math_operators() {
+        let k = kinds("x **= 2 // 3 ** 4\n");
+        assert!(k.contains(&TokenKind::StarStarAssign));
+        assert!(k.contains(&TokenKind::SlashSlash));
+        assert!(k.contains(&TokenKind::StarStar));
     }
 
     #[test]

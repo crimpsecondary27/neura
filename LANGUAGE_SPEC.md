@@ -116,6 +116,7 @@ accumulates VJPs into `.grad`. The example prints `Tensor[1](7.0)`. Supported dt
 ## 6. Standard library surface
 
 ```
+core builtins     print, input, len, range, int, float, abs, sqrt, exp, log, tanh
 neura.tensor      Tensor, scalar, zeros, ones, randn, arange, matmul, add, sub,
                   mul, div, relu, gelu, sigmoid, tanh, exp, log, sqrt, softmax,
                   transpose, reshape, flatten, sum, mean, conv1d, conv2d
@@ -129,6 +130,16 @@ neura.data        load_csv, Dataset.batch/shuffle/split/len
 neura.autograd    backward, no_grad
 neura.device      available, count, default
 neura.serialization save, load
+```
+
+`input()` reads one line from stdin and returns `Str`. `input(TYPE)` and
+`input(prompt, TYPE)` parse that line as `Int`, `Float`, `Bool` or `Str`:
+
+```neura
+fn main():
+    age: Int = input("age: ", Int)
+    ratio = input(Float)
+    print(age + 1)
 ```
 
 ## 7. Diagnostics

@@ -373,6 +373,12 @@ impl<'a> FnLower<'a> {
         let (pos, kwargs) = self.lower_args(args, span);
         match callee {
             NirExpr::Builtin { name, .. } => {
+                if name == "input" {
+                    let prompt = pos.first().copied();
+                    let d = self.alloc(ty.clone());
+                    self.emit(Inst::Input { dst: d, prompt, ty: ty.clone() }, span);
+                    return d;
+                }
                 if name == "print" {
                     if let Some(r) = pos.first() {
                         self.emit(Inst::Print(*r), span);

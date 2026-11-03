@@ -189,6 +189,7 @@ pub enum Inst {
     Return(Option<Reg>),
     Drop(Reg),
     Print(Reg),
+    Input { dst: Reg, prompt: Option<Reg>, ty: Ty },
 }
 
 impl Inst {
@@ -215,7 +216,8 @@ impl Inst {
             | Inst::Index { dst, .. }
             | Inst::Len { dst, .. }
             | Inst::IterInit { dst, .. }
-            | Inst::IterNext { dst, .. } => Some(*dst),
+            | Inst::IterNext { dst, .. }
+            | Inst::Input { dst, .. } => Some(*dst),
             _ => None,
         }
     }
@@ -253,6 +255,7 @@ impl Inst {
             Inst::JumpIfFalse { cond, .. } | Inst::JumpIfTrue { cond, .. } => vec![*cond],
             Inst::Return(Some(r)) => vec![*r],
             Inst::Print(r) => vec![*r],
+            Inst::Input { prompt: Some(r), .. } => vec![*r],
             Inst::Drop(r) => vec![*r],
             _ => vec![],
         }
@@ -381,6 +384,10 @@ fn disasm_inst(inst: &Inst, types: &[Ty]) -> String {
         Inst::Return(None) => "return".into(),
         Inst::Drop(r) => format!("drop %{}", r),
         Inst::Print(r) => format!("print %{}", r),
+        Inst::Input { dst, prompt, ty } => match prompt {
+            Some(p) => format!("%{}: {} = input %{}", dst, ty.name(), p),
+            None => format!("%{}: {} = input", dst, ty.name()),
+        },
     }
 }
 

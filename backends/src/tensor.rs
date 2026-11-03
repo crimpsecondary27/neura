@@ -440,6 +440,8 @@ impl Tensor {
             BinOp::Sub => |a, b| a - b,
             BinOp::Mul => |a, b| a * b,
             BinOp::Div => |a, b| a / b,
+            BinOp::FloorDiv => |a, b| (a / b).floor(),
+            BinOp::Pow => |a, b| a.powf(b),
             BinOp::Mod => |a, b| a % b,
             BinOp::Eq => |a, b| (a == b) as i32 as f64,
             BinOp::Ne => |a, b| (a != b) as i32 as f64,
