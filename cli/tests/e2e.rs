@@ -214,6 +214,37 @@ fn math_operators_evaluate() {
 }
 
 #[test]
+fn add_ls_streams_sequential_models() {
+    let source = write_temp(
+        "stream.neura",
+        "import neura.nn as nn\n\
+         \n\
+         add ls\n\
+         \n\
+         fn main():\n\
+         \x20   model = nn.Sequential([nn.Linear(2, 4), nn.ReLU(), nn.Linear(4, 1)])\n\
+         \x20   sample = Tensor([[1.0, 2.0]])\n\
+         \x20   print(model.forward(sample))\n",
+    );
+    let run_output = run(&["run", &source.display().to_string()]);
+    assert!(run_output.status.success(), "{}", combined_of(&run_output));
+    assert!(
+        stdout_of(&run_output).contains("Tensor[1, 1]"),
+        "{}",
+        stdout_of(&run_output)
+    );
+
+    let profile = run(&["profile", &source.display().to_string()]);
+    assert!(profile.status.success(), "{}", combined_of(&profile));
+    let text = stdout_of(&profile);
+    let steps: Vec<&str> = text.lines().filter(|l| l.starts_with("[stream]")).collect();
+    assert_eq!(steps.len(), 3, "expected one stream step per layer in:\n{}", text);
+    assert!(steps[0].contains("Linear(2, 4"), "{}", text);
+    assert!(steps[2].contains("Linear(4, 1"), "{}", text);
+    let _ = fs::remove_dir_all(source.parent().unwrap());
+}
+
+#[test]
 fn graph_emits_mlir_text_for_tensor_code() {
     let output = run(&["graph", "examples/tensors.neura"]);
     assert!(output.status.success(), "{}", combined_of(&output));

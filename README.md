@@ -67,7 +67,8 @@ fn main():
 Supported: functions, `let [mut]` bindings, `if`/`elif`/`else`, `while`, `for`,
 `return`/`break`/`continue`, structs, imports, keyword arguments, slices, `&`/`&mut`
 borrows, tensor literals, `Tensor[2, 3, f32]` types with `dyn`/symbolic dimensions,
-and automatic shape inference through layers.
+and automatic shape inference through layers. Add `add ls` to a file to stream
+sequential models layer-by-layer during inference.
 
 Full grammar and semantics: [LANGUAGE_SPEC.md](LANGUAGE_SPEC.md).
 

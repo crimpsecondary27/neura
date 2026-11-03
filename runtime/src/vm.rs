@@ -132,6 +132,30 @@ impl<'p> Machine<'p> {
         x ^ (x >> 31)
     }
 
+    /// Run one forward pass. When `add ls` is in effect and the VM is not
+    /// training, sequential models stream layer-by-layer instead of keeping
+    /// every intermediate activation alive.
+    fn forward_layer(&mut self, layer: &Layer, x: &TRef) -> Result<Value, String> {
+        let seed = self.next_seed();
+        if !self.program.streaming || self.options.training {
+            return Ok(Value::Tensor(layer.forward(x, self.options.training, seed)?));
+        }
+        let (out, trace) = layer.forward_streaming(x, seed)?;
+        if self.options.profile {
+            for step in trace {
+                let line = format!(
+                    "[stream] {} -> {:?} ({} bytes)",
+                    step.layer, step.shape, step.bytes
+                );
+                if !self.options.quiet {
+                    println!("{}", line);
+                }
+                self.output.push(line);
+            }
+        }
+        Ok(Value::Tensor(out))
+    }
+
     fn read(&self, frame: &Frame, r: Reg) -> Value {
         frame.regs.get(r as usize).cloned().unwrap_or(Value::Unit)
     }
@@ -769,8 +793,7 @@ impl<'p> Machine<'p> {
             "nn.forward" | "nn.predict" | "inference.predict" => {
                 let l = layer_arg(&args, 0)?;
                 let x = args.get(1).ok_or("forward expects an input tensor")?.as_tensor()?;
-                let seed = self.next_seed();
-                Ok(Value::Tensor(l.forward(&x, self.options.training, seed)?))
+                self.forward_layer(&l, &x)
             }
             "nn.save" | "serialization.save" => {
                 let l = layer_arg(&args, 0)?;
@@ -922,8 +945,7 @@ impl<'p> Machine<'p> {
             Value::Layer(l) => match method {
                 "forward" | "predict" | "inference" => {
                     let x = args.first().ok_or("forward expects an input tensor")?.as_tensor()?;
-                    let seed = self.next_seed();
-                    Ok(Value::Tensor(l.forward(&x, self.options.training, seed)?))
+                    self.forward_layer(&l, &x)
                 }
                 "parameters" => Ok(Value::list(
                     l.params().into_iter().map(Value::Tensor).collect::<Vec<_>>(),
@@ -1616,6 +1638,7 @@ mod tests {
             structs: vec![],
             policies: CompilePolicies::default(),
             source_hash: 7,
+            streaming: false,
         }
     }
 

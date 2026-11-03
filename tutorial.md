@@ -280,6 +280,32 @@ Available layers include `Linear`, `ReLU`, `GELU`, `Sigmoid`, `Tanh`, `Softmax`,
 `RMSProp`. `neura.data` provides CSV loading, deterministic batching, shuffling
 and splits.
 
+### Streaming inference
+
+Add `add ls` at the top of the file (next to the imports) to run sequential
+models one layer at a time during inference:
+
+```neura
+import neura.nn as nn
+
+add ls
+
+fn main():
+    model = nn.Sequential([
+        nn.Linear(2, 32),
+        nn.ReLU(),
+        nn.Linear(32, 3),
+    ])
+    print(model.predict(Tensor([[0.0, 0.0]])))
+```
+
+Each layer's activation is detached from the autograd graph before the next
+layer runs, so only the input, the current activation and the executing layer's
+parameters stay live instead of the whole forward graph. Streaming applies to
+`forward`, `predict` and `inference` only; training always keeps the full graph.
+Run `neura profile` to see one `[stream]` line per layer with its output shape
+and bytes.
+
 Dataset methods:
 
 ```neura

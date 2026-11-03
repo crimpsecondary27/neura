@@ -51,6 +51,9 @@ pub fn format_program(program: &Program) -> String {
             Item::Fn(f) => {
                 out.push_str(&format_fn(f, 0));
             }
+            Item::AddLs => {
+                out.push_str("add ls\n");
+            }
         }
     }
     out
@@ -386,6 +389,12 @@ mod tests {
         assert!(out.contains("w = 7 // 2"), "{}", out);
         assert!(out.contains("x **= 2"), "{}", out);
         assert!(out.contains("w //= 2"), "{}", out);
+    }
+
+    #[test]
+    fn formats_add_ls_directive() {
+        let out = format_source("add ls\n\nfn main():\n  pass\n").unwrap();
+        assert_eq!(out, "add ls\n\nfn main():\n    pass\n");
     }
 
     #[test]

@@ -12,6 +12,8 @@ pub enum Item {
     Fn(FnDecl),
     Struct(StructDecl),
     Import(ImportDecl),
+    /// `add ls` — run sequential models with streaming inference.
+    AddLs,
 }
 
 #[derive(Clone, Debug)]

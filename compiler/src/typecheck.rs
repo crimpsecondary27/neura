@@ -141,6 +141,7 @@ impl Checker {
             name: "main".into(),
             functions: self.pending,
             structs,
+            streaming: program.items.iter().any(|i| matches!(i, Item::AddLs)),
         };
         (module, self.diags, self.report)
     }

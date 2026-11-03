@@ -7,7 +7,7 @@
 use crate::autograd::{self, apply};
 use crate::data::Dataset;
 use crate::optim::Optimizer;
-use crate::value::{tensor, trainable, TRef};
+use crate::value::{tensor, trainable, TRef, TNode};
 use neura_backends::tensor::Tensor;
 use neura_ir::ops::TensorOp;
 use neura_ir::types::{Dim, DType};
@@ -50,6 +50,14 @@ pub enum Layer {
         padding: usize,
     },
     Sequential(Vec<Rc<Layer>>),
+}
+
+/// One step of a streaming forward pass.
+#[derive(Clone, Debug)]
+pub struct StreamStep {
+    pub layer: String,
+    pub shape: Vec<usize>,
+    pub bytes: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -421,6 +429,39 @@ impl Layer {
                 Ok(cur)
             }
         }
+    }
+
+    /// Streaming inference: run a sequential model one layer at a time and
+    /// detach the activation between layers, so only the current activation
+    /// and the executing layer's parameters stay live. The returned trace
+    /// records the shape and bytes each layer produced.
+    pub fn forward_streaming(
+        &self,
+        x: &TRef,
+        seed: u64,
+    ) -> Result<(TRef, Vec<StreamStep>), String> {
+        let layers = match self {
+            Layer::Sequential(layers) => layers,
+            other => {
+                let out = other.forward(x, false, seed)?;
+                return Ok((out, Vec::new()));
+            }
+        };
+        let mut cur = TNode::leaf(x.borrow().data.clone(), false);
+        let mut trace = Vec::with_capacity(layers.len());
+        for (i, layer) in layers.iter().enumerate() {
+            let out = layer.forward(&cur, false, seed.wrapping_add(i as u64))?;
+            let data = out.borrow().data.clone();
+            trace.push(StreamStep {
+                layer: layer.describe(),
+                shape: data.shape.clone(),
+                bytes: data.numel() * data.dtype.size(),
+            });
+            // Inference never calls backward, so the autograd graph built by
+            // this layer can be released before the next one runs.
+            cur = TNode::leaf(data, false);
+        }
+        Ok((cur, trace))
     }
 
     pub fn params(&self) -> Vec<TRef> {

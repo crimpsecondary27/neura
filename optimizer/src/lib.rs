@@ -348,6 +348,7 @@ mod tests {
             structs: vec![],
             policies: CompilePolicies::default(),
             source_hash: 1,
+            streaming: false,
         }
     }
 

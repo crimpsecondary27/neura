@@ -13,6 +13,8 @@ pub struct NirModule {
     pub name: String,
     pub functions: Vec<NirFunction>,
     pub structs: Vec<NirStruct>,
+    /// `add ls`: stream sequential models layer-by-layer during inference.
+    pub streaming: bool,
 }
 
 #[derive(Clone, Debug)]

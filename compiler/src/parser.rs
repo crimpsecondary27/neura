@@ -91,6 +91,14 @@ impl Parser {
                 TokenKind::Fn => items.push(Item::Fn(self.parse_fn())),
                 TokenKind::Struct => items.push(Item::Struct(self.parse_struct())),
                 TokenKind::Import => items.push(Item::Import(self.parse_import())),
+                TokenKind::Ident(name)
+                    if name == "add"
+                        && matches!(self.peek_at(1), TokenKind::Ident(t) if t == "ls") =>
+                {
+                    self.advance();
+                    self.advance();
+                    items.push(Item::AddLs);
+                }
                 TokenKind::Pub => {
                     self.advance();
                     match self.peek() {
@@ -805,6 +813,14 @@ mod tests {
             }
             _ => panic!(),
         }
+    }
+
+    #[test]
+    fn parses_add_ls_directive() {
+        let p = parse_ok("add ls\n\nfn main():\n    pass\n");
+        assert_eq!(p.items.len(), 2);
+        assert!(matches!(p.items[0], Item::AddLs));
+        assert!(matches!(p.items[1], Item::Fn(_)));
     }
 
     #[test]

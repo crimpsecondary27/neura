@@ -14,15 +14,17 @@ under "Not yet implemented" are rejected with diagnostics, never silently ignore
 * Identifiers: `[A-Za-z_][A-Za-z0-9_]*`.
 * Literals: decimal `Int`, `Float` (`1.0`, `1e-3`), `"strings"` with escapes,
   `true`, `false`.
-* Operators: `+ - * / % @ == != < <= > >= && || ! &`, assignment `=`,
-  compound-free. `@` is matrix multiplication.
+* Operators: `+ - * / // % ** @ == != < <= > >= && || ! &`, assignment `=`,
+  compound assignment `+= -= *= /= //= %= **=`. `@` is matrix multiplication and
+  `**` is right-associative exponentiation.
 * Delimiters: `( ) [ ] { } , : . ; -> =`.
 
 ## 2. Grammar (informal EBNF)
 
 ```
 program     := item*
-item        := import | struct | fn
+item        := import | struct | fn | streaming
+streaming   := "add" "ls" NEWLINE
 import      := "import" path ("as" ident)? NEWLINE
 path        := ident ("." ident)*
 struct      := "struct" ident ":" block(field)
@@ -36,6 +38,7 @@ type        := "Int" | "Float" | "Bool" | "Str" | "Unit"
              | ident
 stmt        := "let" "mut"? ident (":" type)? "=" expr NEWLINE
              | ident "=" expr NEWLINE
+             | ident ("+=" | "-=" | "*=" | "/=" | "//=" | "%=" | "**=") expr NEWLINE
              | "if" expr ":" block ("elif" expr ":" block)* ("else" ":" block)?
              | "while" expr ":" block
              | "for" ident "in" expr ":" block
@@ -48,8 +51,9 @@ and         := equality ("&&" equality)*
 equality    := comparison (("==" | "!=") comparison)*
 comparison  := additive (("<" | "<=" | ">" | ">=") additive)*
 additive    := multiplicative (("+" | "-") multiplicative)*
-multiplicative := unary (("*" | "/" | "%" | "@") unary)*
-unary       := ("-" | "!" | "&" "mut"?) unary | postfix
+multiplicative := unary (("*" | "/" | "//" | "%" | "@") unary)*
+unary       := ("-" | "!" | "&" "mut"?) unary | power
+power       := postfix ("**" unary)?
 postfix     := primary (("." ident ("(" args? ")")?) | "[" index "]")*
 primary     := ident | literal | "(" expr ")" | list | call | "[" expr "]"
 list        := "[" (expr ("," expr)* ","?)? "]"
@@ -141,6 +145,27 @@ fn main():
     ratio = input(Float)
     print(age + 1)
 ```
+
+`add ls` is a top-level declaration, written like an import, that switches the
+program to streaming inference:
+
+```neura
+import neura.nn as nn
+
+add ls
+
+fn main():
+    model = nn.Sequential([nn.Linear(2, 8), nn.ReLU(), nn.Linear(8, 3)])
+    print(model.predict(Tensor([[0.0, 0.0]])))
+```
+
+When it is present, `forward`, `predict` and `inference` run a `Sequential`
+model one layer at a time during inference. The activation produced by a layer
+is detached from the autograd graph before the next layer runs, so only the
+input, the current activation and the executing layer's parameters stay live.
+Training is unaffected: `train` and runs with `--training` always build the full
+graph. `neura profile` reports one `[stream]` line per layer with the output
+shape and bytes.
 
 ## 7. Diagnostics
 

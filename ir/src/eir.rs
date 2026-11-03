@@ -150,6 +150,8 @@ pub struct EirProgram {
     pub structs: Vec<EirStruct>,
     pub policies: CompilePolicies,
     pub source_hash: u64,
+    /// `add ls`: run sequential models with streaming inference.
+    pub streaming: bool,
 }
 
 #[derive(Clone, Debug)]

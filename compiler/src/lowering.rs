@@ -69,6 +69,7 @@ pub fn lower(module: &NirModule, policies: CompilePolicies, source_hash: u64) ->
             structs,
             policies,
             source_hash,
+            streaming: module.streaming,
         },
         diags: Vec::new(),
     }
