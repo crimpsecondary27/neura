@@ -1,0 +1,151 @@
+{
+  "name": "neura",
+  "displayName": "Neura",
+  "description": "Language support for the Neura numerical/ML programming language: syntax highlighting, live error checking, build and run.",
+  "version": "0.1.0",
+  "publisher": "neura",
+  "license": "MIT",
+  "icon": "assets/neura-logo.png",
+  "engines": {
+    "vscode": "^1.75.0"
+  },
+  "categories": [
+    "Programming Languages",
+    "Linters"
+  ],
+  "keywords": [
+    "neura",
+    "machine learning",
+    "tensor",
+    "autograd"
+  ],
+  "extensionKind": [
+    "workspace"
+  ],
+  "activationEvents": [
+    "onLanguage:neura"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "languages": [
+      {
+        "id": "neura",
+        "aliases": [
+          "Neura",
+          "neura"
+        ],
+        "extensions": [
+          ".neura"
+        ],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "neura",
+        "scopeName": "source.neura",
+        "path": "./syntaxes/neura.tmLanguage.json"
+      }
+    ],
+    "commands": [
+      {
+        "command": "neura.check",
+        "title": "Check File",
+        "category": "Neura",
+        "icon": "$(check)"
+      },
+      {
+        "command": "neura.run",
+        "title": "Run File",
+        "category": "Neura",
+        "icon": "$(play)"
+      },
+      {
+        "command": "neura.build",
+        "title": "Build Artifact",
+        "category": "Neura",
+        "icon": "$(package)"
+      },
+      {
+        "command": "neura.format",
+        "title": "Format File",
+        "category": "Neura"
+      },
+      {
+        "command": "neura.showOutput",
+        "title": "Show Compiler Output",
+        "category": "Neura"
+      }
+    ],
+    "menus": {
+      "editor/title/run": [
+        {
+          "command": "neura.run",
+          "when": "resourceLangId == neura",
+          "group": "navigation@1"
+        },
+        {
+          "command": "neura.check",
+          "when": "resourceLangId == neura",
+          "group": "navigation@2"
+        }
+      ],
+      "commandPalette": [
+        {
+          "command": "neura.check",
+          "when": "resourceLangId == neura"
+        },
+        {
+          "command": "neura.run",
+          "when": "resourceLangId == neura"
+        },
+        {
+          "command": "neura.build",
+          "when": "resourceLangId == neura"
+        },
+        {
+          "command": "neura.format",
+          "when": "resourceLangId == neura"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Neura",
+      "properties": {
+        "neura.compilerPath": {
+          "type": "string",
+          "default": "neura",
+          "description": "Path to the `neura` compiler binary. May be a bare command resolved on PATH, an absolute path, or a path relative to the workspace."
+        },
+        "neura.checkOnType": {
+          "type": "boolean",
+          "default": true,
+          "description": "Re-check a Neura file for errors while typing (debounced)."
+        },
+        "neura.checkOnSave": {
+          "type": "boolean",
+          "default": true,
+          "description": "Check a Neura file for errors every time it is saved."
+        },
+        "neura.compilerArgs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": [],
+          "description": "Extra arguments passed to every `neura` invocation, for example `--opt=aggressive` or `--device=cpu`."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/node": "^18.19.0",
+    "@types/vscode": "^1.75.0",
+    "typescript": "^5.4.0"
+  }
+}

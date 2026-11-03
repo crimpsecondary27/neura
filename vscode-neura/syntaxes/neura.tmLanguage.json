@@ -1,0 +1,196 @@
+{
+  "$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+  "name": "Neura",
+  "scopeName": "source.neura",
+  "fileTypes": [
+    "neura"
+  ],
+  "patterns": [
+    { "include": "#comments" },
+    { "include": "#fn-definition" },
+    { "include": "#struct-definition" },
+    { "include": "#import" },
+    { "include": "#declarations" },
+    { "include": "#module-namespace" },
+    { "include": "#builtin-types" },
+    { "include": "#builtin-classes" },
+    { "include": "#builtin-functions" },
+    { "include": "#constants" },
+    { "include": "#keywords" },
+    { "include": "#strings" },
+    { "include": "#numbers" },
+    { "include": "#function-call" },
+    { "include": "#operators" },
+    { "include": "#punctuation" }
+  ],
+  "repository": {
+    "comments": {
+      "patterns": [
+        {
+          "name": "comment.line.number-sign.neura",
+          "match": "#.*$"
+        }
+      ]
+    },
+    "fn-definition": {
+      "patterns": [
+        {
+          "match": "\\b(fn)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.function.neura" },
+            "2": { "name": "entity.name.function.neura" }
+          }
+        }
+      ]
+    },
+    "struct-definition": {
+      "patterns": [
+        {
+          "match": "\\b(struct)\\s+([A-Za-z_][A-Za-z0-9_]*)",
+          "captures": {
+            "1": { "name": "storage.type.struct.neura" },
+            "2": { "name": "entity.name.type.neura" }
+          }
+        }
+      ]
+    },
+    "import": {
+      "patterns": [
+        {
+          "match": "\\b(import)\\s+([A-Za-z_][A-Za-z0-9_.]*)",
+          "captures": {
+            "1": { "name": "keyword.control.import.neura" },
+            "2": { "name": "support.namespace.neura" }
+          }
+        }
+      ]
+    },
+    "declarations": {
+      "patterns": [
+        {
+          "name": "storage.type.neura",
+          "match": "\\b(let|mut|fn|struct|import|as)\\b"
+        }
+      ]
+    },
+    "module-namespace": {
+      "patterns": [
+        {
+          "name": "support.namespace.neura",
+          "match": "\\bneura\\.(tensor|nn|optim|math|data|autograd|device|serialization)\\b"
+        },
+        {
+          "name": "support.namespace.neura",
+          "match": "\\bneura\\b"
+        }
+      ]
+    },
+    "builtin-types": {
+      "patterns": [
+        {
+          "name": "storage.type.neura",
+          "match": "\\b(Int|Float|Bool|Str|Unit|Tensor|List)\\b"
+        }
+      ]
+    },
+    "builtin-classes": {
+      "patterns": [
+        {
+          "name": "support.class.neura",
+          "match": "\\b(Linear|Sequential|LayerNorm|BatchNorm|Embedding|Conv1D|Conv2D|Conv|ReLU|GELU|Sigmoid|Softmax|Tanh|Dropout|SGD|Adam|AdamW|RMSProp|Dataset)\\b"
+        }
+      ]
+    },
+    "builtin-functions": {
+      "patterns": [
+        {
+          "name": "support.function.neura",
+          "match": "\\b(print|zeros|ones|randn|arange|matmul|add|sub|mul|div|relu|gelu|sigmoid|tanh|exp|log|sqrt|softmax|transpose|reshape|flatten|sum|mean|max|min|conv1d|conv2d|gather|dropout|backward|no_grad|load_csv|load_dataset|cross_entropy|save|load)\\b"
+        }
+      ]
+    },
+    "constants": {
+      "patterns": [
+        {
+          "name": "constant.language.neura",
+          "match": "\\b(true|false)\\b"
+        }
+      ]
+    },
+    "keywords": {
+      "patterns": [
+        {
+          "name": "keyword.control.neura",
+          "match": "\\b(if|elif|else|while|for|in|return|break|continue|pass|requires_grad|forward|train|predict|parameters|step|zero_grad)\\b"
+        }
+      ]
+    },
+    "strings": {
+      "patterns": [
+        {
+          "name": "string.quoted.double.neura",
+          "begin": "\"",
+          "end": "\"",
+          "patterns": [
+            {
+              "name": "constant.character.escape.neura",
+              "match": "\\\\."
+            }
+          ]
+        }
+      ]
+    },
+    "numbers": {
+      "patterns": [
+        {
+          "name": "constant.numeric.float.neura",
+          "match": "\\b\\d+\\.\\d+([eE][+-]?\\d+)?\\b"
+        },
+        {
+          "name": "constant.numeric.float.neura",
+          "match": "\\b\\d+[eE][+-]?\\d+\\b"
+        },
+        {
+          "name": "constant.numeric.integer.neura",
+          "match": "\\b\\d+\\b"
+        }
+      ]
+    },
+    "function-call": {
+      "patterns": [
+        {
+          "name": "entity.name.function.neura",
+          "match": "\\b([A-Za-z_][A-Za-z0-9_]*)\\s*(?=\\()"
+        }
+      ]
+    },
+    "operators": {
+      "patterns": [
+        {
+          "name": "keyword.operator.neura",
+          "match": "->|@|\\|\\||&&|==|!=|<=|>=|[+\\-*/%<>=!&]"
+        }
+      ]
+    },
+    "punctuation": {
+      "patterns": [
+        {
+          "name": "punctuation.separator.neura",
+          "match": "[,;]"
+        },
+        {
+          "name": "punctuation.section.neura",
+          "match": "[(){}\\[\\]]"
+        },
+        {
+          "name": "punctuation.accessor.neura",
+          "match": "\\."
+        },
+        {
+          "name": "punctuation.separator.colon.neura",
+          "match": ":"
+        }
+      ]
+    }
+  }
+}
